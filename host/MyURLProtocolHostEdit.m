@@ -69,6 +69,9 @@ NSMutableDictionary *hostDict;
         }else if (ipRange.location != NSNotFound){
             [Myrequest setValue:host forHTTPHeaderField:@"Host"];
             break;
+        }else{
+            NSString *originHost = [request.URL host];
+            [Myrequest setValue:originHost forHTTPHeaderField:@"Host"];
         }
     }
     
