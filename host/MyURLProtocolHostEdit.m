@@ -123,32 +123,36 @@ NSMutableDictionary *hostDict;
             return request;
         }
         
+        NSMutableURLRequest *Myrequest = [request mutableCopy];
+        //设置UA，伪装成是safari打开。 因为我的网站有判断，不允许safari以外的浏览器打开
+        [Myrequest setValue:@"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/601.4.4 (KHTML, like Gecko) Version/9.0.3 Safari/601.4.4" forHTTPHeaderField:@"user-agent"];
         NSString *originUrlString = [request.URL absoluteString];
-        NSString *originHostString = @"";
-        NSArray *hosts = [hostDict allKeys];
-        NSRange hostRange = NSMakeRange(NSNotFound, 0);
-        for (int i = 0 ; i < hosts.count ; i++ ) {
-            originHostString = hosts[i];
-            hostRange = [originUrlString rangeOfString:originHostString];
+        
+        NSArray *allHosts = [hostDict allKeys];
+        for (NSString *host in allHosts) {
+            NSString *ip = [hostDict objectForKey:host];
+            //查找请求链接的host是否在host文件中配置了
+            NSRange hostRange = [originUrlString rangeOfString:host];
+            //查找请求链接的host（可能是ip）是否在host文件中配置了。 用于给httpHeader加Host字段。有时候整个网页重定向后，请求链接就会变成是ip组成的host，这个时候也要给加Host头
+            NSRange ipRange = [originUrlString rangeOfString:ip];
+            
             if (hostRange.location != NSNotFound) {
+                NSString *urlString = [originUrlString stringByReplacingCharactersInRange:hostRange withString:ip];
+                NSURL *url = [NSURL URLWithString:urlString];
+                Myrequest.URL = url;
+                [Myrequest setValue:host forHTTPHeaderField:@"Host"];
                 break;
+            }else if (ipRange.location != NSNotFound){
+                [Myrequest setValue:host forHTTPHeaderField:@"Host"];
+                break;
+            }else{
+                NSString *originHost = [request.URL host];
+                [Myrequest setValue:originHost forHTTPHeaderField:@"Host"];
             }
         }
         
-        NSString *ip = [hostDict objectForKey:originHostString];;
-        // 替换域名
-        NSString *urlString = originUrlString;
-        if (hostRange.location != NSNotFound) {
-            urlString = [originUrlString stringByReplacingCharactersInRange:hostRange withString:ip];
-        }
-        NSURL *url = [NSURL URLWithString:urlString];
-        mutableReqeust.URL = url;
-        if (hostRange.location != NSNotFound) {
-            [mutableReqeust setValue:originHostString forHTTPHeaderField:@"Host"];
-        }
         
-        
-        [self.client URLProtocol:self wasRedirectedToRequest:mutableReqeust redirectResponse:response];
+        [self.client URLProtocol:self wasRedirectedToRequest:Myrequest redirectResponse:response];
         return mutableReqeust;
     }else{
         return mutableReqeust;
